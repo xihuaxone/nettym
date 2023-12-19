@@ -17,26 +17,39 @@ import java.util.stream.Collectors;
 public class ReqInvokeHandler extends ChannelDuplexHandler {
     private static final Map<Integer, ReqFuture> REQ_FUTURE_MAP = new ConcurrentHashMap<Integer, ReqFuture>(50);
 
-    private static final int FUTURE_RECYCLE_WATER = 50;
+    private static final int FUTURE_RECYCLE_WATER = 100;
 
     private final Logger logger = LoggerFactory.getLogger(ReqInvokeHandler.class);
 
+    /**
+     * 发起请求前的处理；
+     * @param ctx
+     * @param req
+     */
     private void doRequest(ChannelHandlerContext ctx, NettyReq req) {
         ctx.writeAndFlush(req);
+
+        // 把请求future存储起来；
         REQ_FUTURE_MAP.put(req.getMsgId(), req.getReqFuture());
 
-        // 达到水位则回收过期Future；
+        // 控制请求并发量，达到水位则回收过期Future；
         if (REQ_FUTURE_MAP.size() >= FUTURE_RECYCLE_WATER) {
             recycleExpiredFutures();
         }
     }
 
+    /**
+     * 收到响应时对响应对象的处理；
+     * @param ctx
+     * @param resp
+     */
     private void doRequestCallback(ChannelHandlerContext ctx, NettyResp resp) {
         ReqFuture reqFuture = REQ_FUTURE_MAP.remove(resp.getMsgId());
         if (reqFuture == null) {
             logger.warn("msgId respFuture lost: {}", resp.getMsgId());
             return;
         }
+        // 把响应对象推送到该请求的future中；
         reqFuture.setResp(resp);
     }
 
@@ -55,6 +68,7 @@ public class ReqInvokeHandler extends ChannelDuplexHandler {
             doRequestCallback(ctx, (NettyResp) msg);
             return;
         }
+        // 其他类型的响应对象，放行到后续流水线；
         super.channelRead(ctx, msg);
     }
 
@@ -64,6 +78,7 @@ public class ReqInvokeHandler extends ChannelDuplexHandler {
             doRequest(ctx, (NettyReq) msg);
             return;
         }
+        // 其他类型的请求对象，放行到后续流水线；
         super.write(ctx, msg, promise);
     }
 }

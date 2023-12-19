@@ -57,6 +57,9 @@ public class NettyClientTest {
             e.printStackTrace();
         }
 
-        Thread.sleep(5 * 1000);
+        // hold主线程，供server测试用；
+        while (true) {
+            Thread.sleep(1000);
+        }
     }
 }

@@ -11,13 +11,13 @@ public class IOLogHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        logger.info("channelRead={}", msg);
+        logger.info("msg receive: {}", msg);
         super.channelRead(ctx, msg);
     }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        logger.info("writeable={}, write={}", ctx.channel().isWritable(), msg);
+        logger.info("msg send: {}", msg);
         super.write(ctx, msg, promise);
     }
 }

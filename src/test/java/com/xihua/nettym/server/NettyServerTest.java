@@ -33,6 +33,7 @@ public class NettyServerTest {
             e.printStackTrace();
         }
 
+        // hold主线程，供client测试用；
         while (true) {
             Thread.sleep(1000);
         }

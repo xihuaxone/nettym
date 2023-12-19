@@ -37,7 +37,7 @@ public class NettyClient {
                         .addLast(new ByteBufDecoder())
                         .addLast(new IOLogHandler())
                         .addLast(new IdleStateHandler(0L,0L,5L, TimeUnit.SECONDS))
-                        .addLast()
+                        .addLast(new IdleStateProcessHandler())
                         .addLast(new ChannelInitHandler())
                         .addLast(new ReqHandleHandler())
                         .addLast(new ReqInvokeHandler())

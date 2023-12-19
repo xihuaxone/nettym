@@ -28,14 +28,15 @@ public class NettyServer {
             @Override
             protected void initChannel(Channel channel) throws Exception {
                 channel.pipeline()
-                        .addLast(new LengthFieldBasedFrameDecoder(1024*4, 0, 4, 0, 4))
+                        .addLast(new LengthFieldBasedFrameDecoder(1024 * 4, 0, 4, 0, 4))  // 数据报文动态识别，防止沾包、拆包问题；
                         .addLast(new LengthFieldPrepender(4))
-                        .addLast(new ByteBufEncoder())
-                        .addLast(new ByteBufDecoder())
-                        .addLast(new IOLogHandler())
-                        .addLast(new ChannelInitHandler())
-                        .addLast(new ReqHandleHandler())
-                        .addLast(new ReqInvokeHandler())
+                        .addLast(new ByteBufEncoder())  // response编码器，把要发送的数据编码为二进制流；
+                        .addLast(new ByteBufDecoder())  // request解码器，把接收的二进制流解码为java对象；
+                        .addLast(new IOLogHandler())  // 对网络请求做日志记录；
+                        .addLast(new ChannelInitHandler())  // 对channel的生命周期实现感知和管理；
+                        .addLast(new ReqHandleHandler())  // 对收到的请求，做处理；
+                        .addLast(new ReqInvokeHandler())  // 对要发送出去的请求，做处理；
+                        .addLast(new DefaultHandler())
                 ;
             }
         };

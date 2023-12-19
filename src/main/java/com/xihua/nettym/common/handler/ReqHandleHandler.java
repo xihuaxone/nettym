@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 public class ReqHandleHandler extends SimpleChannelInboundHandler<NettyReq> {
     private static final Map<String, Class<?>> REQ_HANDLER_MAP = new HashMap<>(50);
 
+    // 执行业务处理的线程池，需要保证全局共享；
     private static final ExecutorService REQ_HANDLER_EXECUTOR = new ThreadPoolExecutor(64, 64,
             0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
 
@@ -43,20 +44,19 @@ public class ReqHandleHandler extends SimpleChannelInboundHandler<NettyReq> {
             return;
         }
 
+        // 获取handler实例对象；
         ReqHandler handlerImpl = (ReqHandler) reqHandler.getDeclaredConstructor().newInstance();
 
-        REQ_HANDLER_EXECUTOR.execute(new Runnable() {
-            @Override
-            public void run() {
-                NettyResp resp = handlerImpl.invoke(req.getParams());
-                if (resp == null) {
-                    resp = new NettyResp();
-                    resp.setSuccess(false);
-                    resp.setErrMsg("handler invoke response is null.");
-                }
-                resp.setMsgId(req.getMsgId());
-                ctx.writeAndFlush(resp);
+        // 异步调用handler实例执行业务处理，不阻塞主线程；
+        REQ_HANDLER_EXECUTOR.execute(() -> {
+            NettyResp resp = handlerImpl.invoke(req.getParams());
+            if (resp == null) {
+                resp = new NettyResp();
+                resp.setSuccess(false);
+                resp.setErrMsg("handler invoke response is null.");
             }
+            resp.setMsgId(req.getMsgId());
+            ctx.writeAndFlush(resp);
         });
     }
 }
