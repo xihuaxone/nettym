@@ -10,50 +10,53 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.ConnectException;
+import java.util.concurrent.Callable;
 
 public class NettyClientTest {
     private final Logger logger = LoggerFactory.getLogger(NettyClientTest.class);
 
-    @Test
-    public void run() {
-        Thread nettyConnListener = new Thread(() -> {
-            while (true) {
-                if (ChannelManager.getAll().isEmpty()) {
-                    try {
-                        NettyClient.start("127.0.0.1", 7090);
-                    } catch (ConnectException e) {
-                        logger.warn("can not connect with server: {}, retry.", e.toString());
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    try {
-                        Thread.sleep(2 * 1000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+    private final Runnable nettyConnListener = () -> {
+        while (true) {
+            if (ChannelManager.getAll().isEmpty()) {
+                try {
+                    NettyClient.start("127.0.0.1", 7090);
+                } catch (ConnectException e) {
+                    logger.warn("can not connect with server: {}, retry.", e.toString());
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                try {
+                    Thread.sleep(2 * 1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
             }
-        });
+        }
+    };
+
+    @Test
+    public void run() throws InterruptedException {
+        // 注册client端的服务接口，供server端调用；
+        ReqHandleHandler.registerReqHandler("testClient", CliHandler.class);
 
         // 后台开启netty连接监听；
-        nettyConnListener.setDaemon(true);
-        nettyConnListener.start();
+        Thread listerThread = new Thread(nettyConnListener);
+        listerThread.setDaemon(true);
+        listerThread.start();
 
         // 等待netty连接成功；
         while (ChannelManager.getAll().isEmpty()) {
         }
         logger.info("netty client channels = {}", JSON.toJSONString(ChannelManager.getAll()));
 
-        // 注册client端的服务接口，供server端调用；
-        ReqHandleHandler.registerReqHandler("testClient", CliHandler.class);
-
         // 调用server端的接口；
         try {
-            Object res = new NettyWriter().call("test", 3, "p1", "p2", "p3");
-            logger.info("netty client call resp = {}", JSON.toJSONString(res));
+            Object res = new NettyWriter().call("testServer", 3, "p1", "p2", "p3");
+            logger.info("netty client call res = {}", res);
         } catch (ConnectException e) {
             e.printStackTrace();
         }
 
+        Thread.sleep(5 * 1000);
     }
 }

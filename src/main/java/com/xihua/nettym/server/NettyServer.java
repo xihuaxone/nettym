@@ -16,13 +16,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class NettyServer {
-    private static final int port = 7090;
-
     private static final NioEventLoopGroup reqHandleGroup = new NioEventLoopGroup(64);
 
     private static final Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
-    public static void start() throws InterruptedException {
+    public static void start(int port) throws InterruptedException {
         NioEventLoopGroup main = new NioEventLoopGroup(1);
         NioEventLoopGroup slave = new NioEventLoopGroup(64);
 
