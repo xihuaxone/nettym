@@ -5,90 +5,55 @@ import com.alibaba.fastjson.JSON;
 import com.xihua.nettym.common.NettyWriter;
 import com.xihua.nettym.common.handler.ChannelManager;
 import com.xihua.nettym.common.handler.ReqHandleHandler;
-import io.netty.channel.Channel;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.*;
+import java.net.ConnectException;
 
 public class NettyClientTest {
     private final Logger logger = LoggerFactory.getLogger(NettyClientTest.class);
-    
-    
-    private void startClients(int count) throws InterruptedException {
-        ReqHandleHandler.registerReqHandler("testClient", CliHandler.class);
-
-        for (int i = 0; i < count; i++) {
-            NettyClient.start();
-        }
-    }
-
-    @org.junit.Test
-    public void test() throws InterruptedException {
-        startClients(1);
-
-        Random random = new Random();
-
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(64, 64,
-                0L, TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<Runnable>());
-
-        List<Future<Object>> futureList = new ArrayList<>(100);
-
-        while (ChannelManager.get("127.0.0.1") == null) {
-        }
-        logger.info("server connected.");
-
-        for (int i = 0; i < 10; i++) {
-            Callable<Object> runnable = () -> {
-                Object res = new NettyWriter("127.0.0.1").call("testServer", 3, "p1", "p2", "p3");
-                logger.info("call res={}", res);
-                return res;
-            };
-            Future<Object> future = executor.submit(runnable);
-            futureList.add(future);
-            Thread.sleep(random.nextInt(500));
-        }
-
-        for (Future<Object> future : futureList) {
-            try {
-                Object o = future.get(3, TimeUnit.SECONDS);
-            } catch (ExecutionException | TimeoutException e) {
-                logger.error("error: " + e);
-            }
-        }
-
-        logger.info("finished.");
-        while (true) {
-            Thread.sleep(1000);
-        }
-    }
 
     @Test
-    public void test2() throws InterruptedException, ExecutionException {
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(64, 64,
-                0L, TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<Runnable>());
-
-        FutureTask<Boolean> task = new FutureTask<>(() -> {
-            try {
-                NettyClient.start();
-                return true;
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+    public void run() {
+        Thread nettyConnListener = new Thread(() -> {
+            while (true) {
+                if (ChannelManager.getAll().isEmpty()) {
+                    try {
+                        NettyClient.start("127.0.0.1", 7090);
+                    } catch (ConnectException e) {
+                        logger.warn("can not connect with server: {}, retry.", e.toString());
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    try {
+                        Thread.sleep(2 * 1000);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
         });
-        Future<?> future = executor.submit(task);
-        future.get();
 
-        Channel channel = ChannelManager.getAll().get(0);
+        // 后台开启netty连接监听；
+        nettyConnListener.setDaemon(true);
+        nettyConnListener.start();
+
+        // 等待netty连接成功；
+        while (ChannelManager.getAll().isEmpty()) {
+        }
         logger.info("netty client channels = {}", JSON.toJSONString(ChannelManager.getAll()));
 
-        Object res = new NettyWriter().call("test", 3, "p1", "p2", "p3");
-        logger.info("netty client call resp = {}", JSON.toJSONString(res));
+        // 注册client端的服务接口，供server端调用；
+        ReqHandleHandler.registerReqHandler("testClient", CliHandler.class);
+
+        // 调用server端的接口；
+        try {
+            Object res = new NettyWriter().call("test", 3, "p1", "p2", "p3");
+            logger.info("netty client call resp = {}", JSON.toJSONString(res));
+        } catch (ConnectException e) {
+            e.printStackTrace();
+        }
+
     }
 }

@@ -10,18 +10,20 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class NettyClient {
-    private static final String host = "127.0.0.1";
-    private static final int port = 7090;
+import java.net.ConnectException;
+import java.util.concurrent.TimeUnit;
 
+public class NettyClient {
     private static final Logger logger = LoggerFactory.getLogger(NettyClient.class);
 
-    public static void start() throws InterruptedException {
+    public static void start(String host, int port) throws InterruptedException, ConnectException {
+
         NioEventLoopGroup main = new NioEventLoopGroup(1);
 
 
@@ -34,6 +36,8 @@ public class NettyClient {
                         .addLast(new ByteBufEncoder())
                         .addLast(new ByteBufDecoder())
                         .addLast(new IOLogHandler())
+                        .addLast(new IdleStateHandler(0L,0L,5L, TimeUnit.SECONDS))
+                        .addLast()
                         .addLast(new ChannelInitHandler())
                         .addLast(new ReqHandleHandler())
                         .addLast(new ReqInvokeHandler())

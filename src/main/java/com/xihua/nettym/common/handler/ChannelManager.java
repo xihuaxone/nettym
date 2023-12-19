@@ -22,11 +22,23 @@ public class ChannelManager {
         return CHANNEL_MAP.getOrDefault(remoteIp, null);
     }
 
-    public static void put(String remoteAddr, Channel channel) {
-        ChannelManager.CHANNEL_MAP.putIfAbsent(remoteAddr, channel);
+    /**
+     * 主动关闭channel，netty会自动触发remove方法来删除CHANNEL_MAP中的该channel；
+     * @param channel
+     */
+    public static void disconnect(Channel channel) {
+        channel.closeFuture();
     }
 
-    public static void remove(String remoteAddr) {
-        ChannelManager.CHANNEL_MAP.remove(remoteAddr);
+    protected static void put(String remoteAddr, Channel channel) {
+        synchronized (CHANNEL_MAP) {
+            ChannelManager.CHANNEL_MAP.putIfAbsent(remoteAddr, channel);
+        }
+    }
+
+    protected static void remove(String remoteAddr) {
+        synchronized (CHANNEL_MAP) {
+            ChannelManager.CHANNEL_MAP.remove(remoteAddr);
+        }
     }
 }

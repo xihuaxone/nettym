@@ -1,28 +1,39 @@
-package com.xihua.nettym.server;
+package com.xihua.nettym.client;
 
 
+import com.alibaba.fastjson.JSON;
 import com.xihua.nettym.common.NettyWriter;
 import com.xihua.nettym.common.handler.ChannelManager;
 import com.xihua.nettym.common.handler.ReqHandleHandler;
+import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
 
-public class NettyServerTest {
-    private final Logger logger = LoggerFactory.getLogger(NettyServerTest.class);
+public class NettyClientCocurrentTest {
+    private final Logger logger = LoggerFactory.getLogger(NettyClientCocurrentTest.class);
 
-    private void startServer() throws InterruptedException {
-        ReqHandleHandler.registerReqHandler("testServer", ServerHandler.class);
-        NettyServer.start();
+    private void startClient() throws InterruptedException {
+        ReqHandleHandler.registerReqHandler("testClient", CliHandler.class);
+
+        while (ChannelManager.getAll().isEmpty()) {
+            try {
+                NettyClient.start("127.0.0.1", 7090);
+            } catch (ConnectException e) {
+                logger.warn("can not connect with server: {}, retry.", e.toString());
+            }
+            Thread.sleep(2 * 1000);
+        }
     }
 
-    @org.junit.Test
+    @Test
     public void test() throws InterruptedException {
-        startServer();
+        startClient();
 
         Random random = new Random();
 
@@ -34,11 +45,11 @@ public class NettyServerTest {
 
         while (ChannelManager.get("127.0.0.1") == null) {
         }
-        logger.info("client connected.");
+        logger.info("server connected.");
 
         for (int i = 0; i < 10; i++) {
             Callable<Object> runnable = () -> {
-                Object res = new NettyWriter("127.0.0.1").call("testClient", 3, "p1", "p2", "p3");
+                Object res = new NettyWriter("127.0.0.1").call("testServer", 3, "p1", "p2", "p3");
                 logger.info("call res={}", res);
                 return res;
             };
@@ -51,10 +62,11 @@ public class NettyServerTest {
             try {
                 Object o = future.get(3, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                logger.error("error: ", e);
+                logger.error("error: " + e);
             }
         }
 
+        logger.info("finished.");
         while (true) {
             Thread.sleep(1000);
         }
