@@ -19,7 +19,8 @@ public class NettyClientTest {
         while (true) {
             if (ChannelManager.getAll().isEmpty()) {
                 try {
-                    NettyClient.start("127.0.0.1", 8080);
+//                    NettyClient.start("127.0.0.1", 3090);
+                    NettyClient.start("xx", 80);
                 } catch (ConnectException e) {
                     logger.warn("can not connect with server: {}, retry.", e.toString());
                 } catch (InterruptedException e) {
@@ -51,7 +52,7 @@ public class NettyClientTest {
 
         // 调用server端的接口；
         try {
-            Object res = new NettyWriter().call("sayHi", 3, "p1", "p2", "p3");
+            Object res = new NettyWriter().call("localCmd", 3, "python /root/admin/scripts/hello.py");
             logger.info("netty client call res = {}", res);
         } catch (ConnectException e) {
             e.printStackTrace();

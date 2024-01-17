@@ -38,7 +38,7 @@
     </dependencies>
 
     <build>
-        <finalName>mqttm</finalName>
+        <finalName>nettym</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

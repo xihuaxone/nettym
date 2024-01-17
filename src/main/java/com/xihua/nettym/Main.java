@@ -1,6 +1,7 @@
 package com.xihua.nettym;
 
 import com.xihua.nettym.common.handler.ReqHandleHandler;
+import com.xihua.nettym.handlers.LocalCmdHandler;
 import com.xihua.nettym.handlers.SayHiHandler;
 import com.xihua.nettym.server.NettyServer;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         // java -jar mqttm-jar-with-dependencies.jar port=8080
+        // scp nettym-jar-with-dependencies.jar user@ip:/root/admin/nettym
 
         Map<String, String> option = new HashMap<>(args.length);
         for (String arg : args) {
@@ -24,6 +26,8 @@ public class Main {
         int port = Integer.parseInt(option.getOrDefault("port", "3090"));
 
         ReqHandleHandler.registerReqHandler("sayHi", SayHiHandler.class);
+        ReqHandleHandler.registerReqHandler("localCmd", LocalCmdHandler.class);
+
         logger.info("start server with port={}", port);
         NettyServer.start(port);
     }
