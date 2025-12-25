@@ -19,8 +19,8 @@ public class NettyClientTest {
         while (true) {
             if (ChannelManager.getAll().isEmpty()) {
                 try {
-//                    NettyClient.start("127.0.0.1", 3090);
-                    NettyClient.start("xx", 80);
+                    NettyClient.start("127.0.0.1", 7090); // 修复：端口应该与服务器端口一致
+//                    NettyClient.start("xx", 80);
                 } catch (ConnectException e) {
                     logger.warn("can not connect with server: {}, retry.", e.toString());
                 } catch (InterruptedException e) {

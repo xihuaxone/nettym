@@ -5,15 +5,18 @@ import com.xihua.nettym.common.domain.NettyResp;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ReqHandleHandler extends SimpleChannelInboundHandler<NettyReq> {
-    private static final Map<String, Class<?>> REQ_HANDLER_MAP = new HashMap<>(50);
+    private static final Map<String, Class<?>> REQ_HANDLER_MAP = new ConcurrentHashMap<>(50);
+    private static final Logger logger = LoggerFactory.getLogger(ReqHandleHandler.class);
 
     // 执行业务处理的线程池，需要保证全局共享；
     private static final ExecutorService REQ_HANDLER_EXECUTOR = new ThreadPoolExecutor(64, 64,
@@ -45,18 +48,42 @@ public class ReqHandleHandler extends SimpleChannelInboundHandler<NettyReq> {
         }
 
         // 获取handler实例对象；
-        ReqHandler handlerImpl = (ReqHandler) reqHandler.getDeclaredConstructor().newInstance();
+        ReqHandler handlerImpl;
+        try {
+            handlerImpl = (ReqHandler) reqHandler.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            logger.error("Failed to create handler instance for api: {}", req.getApi(), e);
+            NettyResp resp = new NettyResp();
+            resp.setMsgId(req.getMsgId());
+            resp.setSuccess(false);
+            resp.setErrMsg("Failed to create handler instance: " + e.getMessage());
+            ctx.writeAndFlush(resp);
+            return;
+        }
 
         // 异步调用handler实例执行业务处理，不阻塞主线程；
         REQ_HANDLER_EXECUTOR.execute(() -> {
-            NettyResp resp = handlerImpl.invoke(req.getParams());
-            if (resp == null) {
+            NettyResp resp;
+            try {
+                resp = handlerImpl.invoke(req.getParams());
+                if (resp == null) {
+                    resp = new NettyResp();
+                    resp.setSuccess(false);
+                    resp.setErrMsg("handler invoke response is null.");
+                }
+            } catch (Exception e) {
+                logger.error("Handler invoke error for api: {}, msgId: {}", req.getApi(), req.getMsgId(), e);
                 resp = new NettyResp();
                 resp.setSuccess(false);
-                resp.setErrMsg("handler invoke response is null.");
+                resp.setErrMsg("Handler invoke error: " + e.getMessage());
             }
             resp.setMsgId(req.getMsgId());
-            ctx.writeAndFlush(resp);
+            // 检查 channel 是否仍然活跃
+            if (ctx.channel().isActive()) {
+                ctx.writeAndFlush(resp);
+            } else {
+                logger.warn("Channel is not active, cannot send response for msgId: {}", req.getMsgId());
+            }
         });
     }
 }

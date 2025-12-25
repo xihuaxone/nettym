@@ -2,7 +2,6 @@ package com.xihua.nettym.server;
 
 import com.xihua.nettym.common.handler.*;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -16,17 +15,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class NettyServer {
-    private static final NioEventLoopGroup reqHandleGroup = new NioEventLoopGroup(64);
-
     private static final Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
     public static void start(int port) throws InterruptedException {
         NioEventLoopGroup main = new NioEventLoopGroup(1);
         NioEventLoopGroup slave = new NioEventLoopGroup(64);
 
-        ChannelInitializer<SocketChannel> initializer = new ChannelInitializer() {
+        ChannelInitializer<SocketChannel> initializer = new ChannelInitializer<SocketChannel>() {
             @Override
-            protected void initChannel(Channel channel) throws Exception {
+            protected void initChannel(SocketChannel channel) throws Exception {
                 channel.pipeline()
                         .addLast(new LengthFieldBasedFrameDecoder(1024 * 4, 0, 4, 0, 4))  // 数据报文动态识别，防止沾包、拆包问题；
                         .addLast(new LengthFieldPrepender(4))

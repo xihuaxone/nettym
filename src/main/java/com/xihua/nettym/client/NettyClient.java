@@ -2,7 +2,6 @@ package com.xihua.nettym.client;
 
 import com.xihua.nettym.common.handler.*;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -23,39 +22,61 @@ public class NettyClient {
     private static final Logger logger = LoggerFactory.getLogger(NettyClient.class);
 
     public static void start(String host, int port) throws InterruptedException, ConnectException {
-
         NioEventLoopGroup main = new NioEventLoopGroup(1);
 
+        try {
+            ChannelInitializer<SocketChannel> initializer = new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel channel) throws Exception {
+                    channel.pipeline()
+                            .addLast(new LengthFieldBasedFrameDecoder(1024*4, 0, 4, 0, 4))
+                            .addLast(new LengthFieldPrepender(4))
+                            .addLast(new ByteBufEncoder())
+                            .addLast(new ByteBufDecoder())
+                            .addLast(new IOLogHandler())
+                            .addLast(new IdleStateHandler(0L,0L,5L, TimeUnit.SECONDS))
+                            .addLast(new IdleStateProcessHandler())
+                            .addLast(new ChannelInitHandler())
+                            .addLast(new ReqHandleHandler())
+                            .addLast(new ReqInvokeHandler())
+                    ;
+                }
+            };
 
-        ChannelInitializer<SocketChannel> initializer = new ChannelInitializer() {
-            @Override
-            protected void initChannel(Channel channel) throws Exception {
-                channel.pipeline()
-                        .addLast(new LengthFieldBasedFrameDecoder(1024*4, 0, 4, 0, 4))
-                        .addLast(new LengthFieldPrepender(4))
-                        .addLast(new ByteBufEncoder())
-                        .addLast(new ByteBufDecoder())
-                        .addLast(new IOLogHandler())
-                        .addLast(new IdleStateHandler(0L,0L,5L, TimeUnit.SECONDS))
-                        .addLast(new IdleStateProcessHandler())
-                        .addLast(new ChannelInitHandler())
-                        .addLast(new ReqHandleHandler())
-                        .addLast(new ReqInvokeHandler())
-                ;
+            Bootstrap bootstrap = new Bootstrap();
+            bootstrap.group(main)
+                    .channel(NioSocketChannel.class)
+                    .handler(initializer);
+
+            ChannelFuture initFuture = bootstrap.connect(host, port).sync();
+
+            // 检查连接是否成功
+            if (!initFuture.isSuccess()) {
+                Throwable cause = initFuture.cause();
+                logger.error("Failed to connect to {}:{}", host, port, cause);
+                // 连接失败时关闭 EventLoopGroup
+                main.shutdownGracefully();
+                throw new ConnectException("Failed to connect to " + host + ":" + port + ": " + 
+                        (cause != null ? cause.getMessage() : "Unknown error"));
             }
-        };
 
-        Bootstrap bootstrap = new Bootstrap();
-        bootstrap.group(main)
-                .channel(NioSocketChannel.class)
-                .handler(initializer);
-
-        ChannelFuture initFuture = bootstrap.connect(host, port).sync();
-
-        initFuture.addListener(new GenericFutureListener<Future<? super Void>>() {
-            public void operationComplete(Future<? super Void> future) throws Exception {
-                logger.info("client init finished: {}", future.isSuccess());
+            initFuture.addListener(new GenericFutureListener<Future<? super Void>>() {
+                public void operationComplete(Future<? super Void> future) throws Exception {
+                    logger.info("client init finished: {}", future.isSuccess());
+                }
+            });
+        } catch (ConnectException e) {
+            // 连接失败时关闭 EventLoopGroup
+            main.shutdownGracefully();
+            throw e;
+        } catch (Exception e) {
+            // 连接失败时关闭 EventLoopGroup
+            main.shutdownGracefully();
+            if (e.getCause() instanceof java.net.ConnectException) {
+                throw new ConnectException("Connection refused: " + host + ":" + port);
+            } else {
+                throw new ConnectException("Failed to start client: " + e.getMessage());
             }
-        });
+        }
     }
 }
